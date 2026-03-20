@@ -5,7 +5,7 @@ Lightweight Bayesian hyperparameter optimization using HEBO, with a `contextvars
 ## Install
 
 ```bash
-git clone https://github.com/facebookresearch/lazyopt.git
+git clone https://github.com/kegl/lazyopt.git
 cd lazyopt
 pip install -e .
 ```
