@@ -58,4 +58,4 @@ Open a GitHub issue with:
 
 ## License
 
-By contributing, you agree that your contributions will be licensed under the [CC BY-NC 4.0](LICENSE) license.
+By contributing, you agree that your contributions will be licensed under the [BSD 3-Clause](LICENSE) license.
