@@ -3,10 +3,10 @@
 import pytest
 
 from lazyopt.space import (
-    parse_hp_calls,
-    load_yaml_config,
-    collect_search_space,
     build_hebo_space,
+    collect_search_space,
+    load_yaml_config,
+    parse_hp_calls,
 )
 
 
@@ -71,6 +71,21 @@ x = hp(name="x", dtype="int", default=1, values=[1, 2, 3])
         assert params[0]["name"] == "x"
         assert params[0]["values"] == [1, 2, 3]
 
+    def test_missing_file_raises(self):
+        with pytest.raises(FileNotFoundError, match="Source file not found"):
+            parse_hp_calls("/nonexistent/file.py")
+
+    def test_variable_ref_raises(self, tmp_path):
+        code = """
+from lazyopt import hp
+DEFAULT = 0.1
+lr = hp("lr", "float", DEFAULT)
+"""
+        p = tmp_path / "varref.py"
+        p.write_text(code)
+        with pytest.raises(ValueError, match="must be a literal"):
+            parse_hp_calls(str(p))
+
 
 class TestLoadYaml:
     def test_loads_params(self, sample_yaml):
@@ -78,6 +93,27 @@ class TestLoadYaml:
         assert "my_model.lr" in params
         assert "my_model.depth" in params
         assert params["my_model.lr"]["values"] == [0.01, 0.1, 1.0]
+
+    def test_missing_yaml_raises(self):
+        with pytest.raises(FileNotFoundError, match="YAML config not found"):
+            load_yaml_config("/nonexistent.yaml")
+
+    def test_empty_yaml_raises(self, tmp_path):
+        p = tmp_path / "empty.yaml"
+        p.write_text("")
+        with pytest.raises(ValueError, match="must be a mapping"):
+            load_yaml_config(str(p))
+
+    def test_missing_keys_raises(self, tmp_path):
+        content = """
+ns:
+  param:
+    values: [1, 2, 3]
+"""
+        p = tmp_path / "bad.yaml"
+        p.write_text(content)
+        with pytest.raises(ValueError, match="missing required keys"):
+            load_yaml_config(str(p))
 
 
 class TestCollectSearchSpace:
@@ -106,6 +142,16 @@ lr = hp("lr", "float", 0.1)
         with pytest.raises(ValueError, match="no grid values"):
             collect_search_space([str(p)])
 
+    def test_empty_values_raises(self, tmp_path):
+        code = """
+from lazyopt import hp
+lr = hp("lr", "float", 0.1, values=[])
+"""
+        p = tmp_path / "empty_grid.py"
+        p.write_text(code)
+        with pytest.raises(ValueError, match="no grid values"):
+            collect_search_space([str(p)])
+
 
 class TestBuildHeboSpace:
     def test_builds_space(self):
@@ -117,3 +163,9 @@ class TestBuildHeboSpace:
         assert "m.lr" in idx_map
         assert idx_map["m.lr"] == [0.01, 0.1, 1.0]
         assert idx_map["m.depth"] == [3, 5, 7]
+        assert space.num_paras == 2
+
+    def test_empty_values_raises(self):
+        params = [{"qualified_name": "m.x", "values": []}]
+        with pytest.raises(ValueError, match="empty values list"):
+            build_hebo_space(params)

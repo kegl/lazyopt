@@ -1,5 +1,10 @@
 """HyperOptimizer: HEBO-driven Bayesian hyperparameter optimization."""
 
+from __future__ import annotations
+
+import math
+import warnings
+
 import numpy as np
 import pandas as pd
 from hebo.optimizers.hebo import HEBO
@@ -7,6 +12,8 @@ from hebo.optimizers.hebo import HEBO
 from .context import _trial_context
 from .results import TrialResults
 from .space import build_hebo_space, collect_search_space
+
+__all__ = ["HyperOptimizer"]
 
 
 class HyperOptimizer:
@@ -16,9 +23,14 @@ class HyperOptimizer:
     runs a trial loop calling the user's objective function with
     ContextVar-based proxy resolution.
 
-    Results are auto-saved after every trial. If `results_path` points
-    to an existing CSV from a previous run, past observations are
-    replayed into HEBO and optimization resumes from where it left off.
+    Results are auto-saved atomically after every trial.  If
+    ``results_path`` points to an existing CSV from a previous run,
+    past observations are replayed into HEBO and optimization resumes
+    from where it left off.
+
+    If the objective function raises an exception during a trial,
+    the trial is recorded with ``score = float('inf')`` and
+    optimization continues.
     """
 
     def __init__(
@@ -28,7 +40,7 @@ class HyperOptimizer:
         n_iterations: int = 50,
         results_path: str = "results.csv",
         seed: int = 42,
-    ):
+    ) -> None:
         self.source_files = source_files
         self.yaml_config = yaml_config
         self.n_iterations = n_iterations
@@ -39,15 +51,41 @@ class HyperOptimizer:
         self.space, self.index_to_value = build_hebo_space(self.params)
 
     def _value_to_index(self, qname: str, value) -> int:
-        """Map an actual parameter value back to its grid index."""
+        """Map an actual parameter value back to its grid index.
+
+        Uses numeric tolerance for float comparisons to survive
+        CSV round-trip precision loss.
+        """
         values_list = self.index_to_value[qname]
         for i, v in enumerate(values_list):
-            if isinstance(v, float) and isinstance(value, float):
-                if abs(v - value) < 1e-15:
+            if isinstance(v, (int, float)) and isinstance(value, (int, float)):
+                if math.isclose(float(v), float(value), rel_tol=1e-9, abs_tol=1e-12):
                     return i
             elif v == value:
                 return i
-        return values_list.index(value)
+        raise ValueError(
+            f"Value {value!r} (type={type(value).__name__}) not found "
+            f"in grid for {qname}. Grid: {values_list}"
+        )
+
+    def _validate_space_compatibility(self, results: TrialResults) -> None:
+        """Ensure loaded results match current search space."""
+        if results.n_trials == 0:
+            return
+        sample_params = results._trials[0][1]
+        expected = {p["qualified_name"] for p in self.params}
+        loaded = set(sample_params.keys())
+        if loaded != expected:
+            missing = expected - loaded
+            extra = loaded - expected
+            parts = []
+            if missing:
+                parts.append(f"missing: {missing}")
+            if extra:
+                parts.append(f"extra: {extra}")
+            raise ValueError(
+                "Loaded results don't match current search space. " + ", ".join(parts)
+            )
 
     def _replay_observations(self, opt: HEBO, results: TrialResults) -> None:
         """Feed all past trials into HEBO so it resumes with full history."""
@@ -73,7 +111,10 @@ class HyperOptimizer:
 
         If ``results_path`` points to an existing CSV, past trials are
         loaded and replayed into HEBO before continuing. New results
-        are appended and the CSV is re-written after every trial.
+        are appended and the CSV is re-written atomically after every trial.
+
+        If ``objective()`` raises an exception, the trial is recorded
+        with ``score = float('inf')`` and optimization continues.
 
         Parameters
         ----------
@@ -93,6 +134,7 @@ class HyperOptimizer:
         n_completed = results.n_trials
 
         if n_completed > 0:
+            self._validate_space_compatibility(results)
             self._replay_observations(opt, results)
             print(
                 f"Resumed from {self.results_path}: {n_completed} past trials loaded."
@@ -112,10 +154,17 @@ class HyperOptimizer:
             for p in self.params:
                 qname = p["qualified_name"]
                 idx = int(suggestion[qname].iloc[0])
-                idx = np.clip(idx, 0, len(self.index_to_value[qname]) - 1)
+                idx = int(np.clip(idx, 0, len(self.index_to_value[qname]) - 1))
                 values_dict[qname] = self.index_to_value[qname][idx]
 
-            score = self._run_trial(objective, values_dict)
+            try:
+                score = self._run_trial(objective, values_dict)
+            except Exception as e:
+                warnings.warn(
+                    f"Trial {i} failed: {e}. Recording score=inf.",
+                    stacklevel=2,
+                )
+                score = float("inf")
 
             indices_dict = {}
             for p in self.params:

@@ -47,6 +47,14 @@ class TestTrialResults:
         assert "iteration" in content
         assert "0.5" in content
 
+    def test_to_csv_is_atomic(self, tmp_path):
+        r = TrialResults()
+        r.add(0, {"x": 1}, 0.5)
+        path = str(tmp_path / "atomic.csv")
+        r.to_csv(path)
+        tmp_files = list(tmp_path.glob("*.tmp"))
+        assert len(tmp_files) == 0
+
     def test_to_json(self, tmp_path):
         r = TrialResults()
         r.add(0, {"x": 1}, 0.5)
@@ -57,19 +65,33 @@ class TestTrialResults:
         assert len(data) == 1
         assert data[0]["score"] == 0.5
 
-    def test_repr(self):
+    def test_repr_zero(self):
         r = TrialResults()
         assert "0 trials" in repr(r)
+
+    def test_repr_singular(self):
+        r = TrialResults()
         r.add(0, {}, 0.5)
-        assert "1 trials" in repr(r)
-        assert "0.5" in repr(r)
+        assert "1 trial," in repr(r)
+
+    def test_repr_plural(self):
+        r = TrialResults()
+        r.add(0, {}, 0.5)
+        r.add(1, {}, 0.3)
+        assert "2 trials," in repr(r)
+
+    def test_tie_breaking_returns_first(self):
+        r = TrialResults()
+        r.add(0, {"a": "first"}, 0.3)
+        r.add(1, {"a": "second"}, 0.3)
+        assert r.best_params == {"a": "first"}
 
 
 class TestFromCsv:
     def test_round_trip(self, tmp_path):
         r = TrialResults()
-        r.add(0, {"m.lr": 0.1, "m.depth": 3}, 0.5)
-        r.add(1, {"m.lr": 0.01, "m.depth": 5}, 0.3)
+        r.add(0, {"m.lr": 0.1, "m.depth": 3.0}, 0.5)
+        r.add(1, {"m.lr": 0.01, "m.depth": 5.0}, 0.3)
         path = str(tmp_path / "results.csv")
         r.to_csv(path)
 
@@ -88,9 +110,16 @@ class TestFromCsv:
         loaded = TrialResults.from_csv(str(path))
         assert loaded.n_trials == 0
 
-    def test_preserves_dtypes(self, tmp_path):
+    def test_corrupted_file_returns_empty(self, tmp_path):
+        path = tmp_path / "corrupted.csv"
+        path.write_text("not,a,valid\ncsv\x00content")
+        with pytest.warns(match="Corrupted"):
+            loaded = TrialResults.from_csv(str(path))
+        assert loaded.n_trials == 0
+
+    def test_preserves_float_types(self, tmp_path):
         r = TrialResults()
-        r.add(0, {"m.lr": 0.01, "m.depth": 5}, 0.42)
+        r.add(0, {"m.lr": 0.01}, 0.42)
         path = str(tmp_path / "typed.csv")
         r.to_csv(path)
 
