@@ -1,6 +1,7 @@
 """Tests for devai_hyperopt.results."""
 
 import json
+
 import pytest
 
 from devai_hyperopt.results import TrialResults
@@ -14,6 +15,12 @@ class TestTrialResults:
         r.add(2, {"lr": 1.0}, 0.7)
         assert r.best_score == 0.3
         assert r.best_params == {"lr": 0.01}
+
+    def test_n_trials(self):
+        r = TrialResults()
+        assert r.n_trials == 0
+        r.add(0, {"a": 1}, 0.5)
+        assert r.n_trials == 1
 
     def test_empty_raises(self):
         r = TrialResults()
@@ -56,3 +63,37 @@ class TestTrialResults:
         r.add(0, {}, 0.5)
         assert "1 trials" in repr(r)
         assert "0.5" in repr(r)
+
+
+class TestFromCsv:
+    def test_round_trip(self, tmp_path):
+        r = TrialResults()
+        r.add(0, {"m.lr": 0.1, "m.depth": 3}, 0.5)
+        r.add(1, {"m.lr": 0.01, "m.depth": 5}, 0.3)
+        path = str(tmp_path / "results.csv")
+        r.to_csv(path)
+
+        loaded = TrialResults.from_csv(path)
+        assert loaded.n_trials == 2
+        assert loaded.best_score == 0.3
+        assert loaded.best_params["m.lr"] == 0.01
+
+    def test_missing_file_returns_empty(self, tmp_path):
+        loaded = TrialResults.from_csv(str(tmp_path / "nonexistent.csv"))
+        assert loaded.n_trials == 0
+
+    def test_empty_file_returns_empty(self, tmp_path):
+        path = tmp_path / "empty.csv"
+        path.write_text("")
+        loaded = TrialResults.from_csv(str(path))
+        assert loaded.n_trials == 0
+
+    def test_preserves_dtypes(self, tmp_path):
+        r = TrialResults()
+        r.add(0, {"m.lr": 0.01, "m.depth": 5}, 0.42)
+        path = str(tmp_path / "typed.csv")
+        r.to_csv(path)
+
+        loaded = TrialResults.from_csv(path)
+        params = loaded.best_params
+        assert isinstance(params["m.lr"], float)

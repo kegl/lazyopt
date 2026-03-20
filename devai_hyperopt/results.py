@@ -1,6 +1,8 @@
 """TrialResults: structured logging of optimization trials."""
 
 import json
+from pathlib import Path
+
 import pandas as pd
 
 
@@ -12,6 +14,27 @@ class TrialResults:
 
     def add(self, iteration: int, params: dict, score: float) -> None:
         self._trials.append((iteration, params, score))
+
+    @classmethod
+    def from_csv(cls, path: str) -> "TrialResults":
+        """Load results from a previously saved CSV file."""
+        p = Path(path)
+        if not p.exists() or p.stat().st_size == 0:
+            return cls()
+        df = pd.read_csv(path)
+        obj = cls()
+        for _, row in df.iterrows():
+            it = int(row["iteration"])
+            score = float(row["score"])
+            params = {
+                col: row[col] for col in df.columns if col not in ("iteration", "score")
+            }
+            obj._trials.append((it, params, score))
+        return obj
+
+    @property
+    def n_trials(self) -> int:
+        return len(self._trials)
 
     @property
     def best_score(self) -> float:

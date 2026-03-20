@@ -5,8 +5,9 @@ Lightweight Bayesian hyperparameter optimization using HEBO, with a `contextvars
 ## Install
 
 ```bash
-cd /home/balazskegl/devai-hyperopt
-conda run -n ds pip install -e .
+git clone https://github.com/facebookresearch/devai-hyperopt.git
+cd devai-hyperopt
+pip install -e .
 ```
 
 ## How it works
@@ -64,16 +65,19 @@ def objective():
     model = MyModel(lr=float(lr), depth=int(depth))
     return model.evaluate()  # return score to minimize
 
-opt = HyperOptimizer(source_files=[__file__], n_iterations=30)
+opt = HyperOptimizer(
+    source_files=[__file__],
+    n_iterations=30,
+    results_path="results.csv",  # auto-saves after each trial
+)
 results = opt.run(objective)
 print(results.best_score, results.best_params)
-results.to_csv("results.csv")
 ```
 
 ## Example
 
 ```bash
-conda run -n ds python examples/lgbm_classifier.py
+python examples/lgbm_classifier.py
 ```
 
 Runs 30 HEBO iterations optimizing 5 LightGBM hyperparameters on the breast cancer dataset with 5-fold cross-validation.
@@ -83,10 +87,26 @@ Runs 30 HEBO iterations optimizing 5 LightGBM hyperparameters on the breast canc
 | Symbol | Description |
 |--------|-------------|
 | `hp(name, dtype, default, values=None)` | Declare a hyperparameter proxy |
-| `HyperOptimizer(source_files, yaml_config=None, n_iterations=50, seed=42)` | Create optimizer |
+| `HyperOptimizer(source_files, ..., results_path="results.csv", ...)` | Create optimizer |
 | `HyperOptimizer.run(objective)` | Run optimization, returns `TrialResults` |
 | `TrialResults.best_score` | Best (minimum) score |
 | `TrialResults.best_params` | Parameters of the best trial |
+| `TrialResults.from_csv(path)` | Load results from a previous run |
 | `TrialResults.to_csv(path)` / `to_json(path)` | Export results |
 | `get_registry()` | Return the current proxy registry |
 | `clear_registry()` | Clear all registered proxies |
+
+## Crash recovery and resume
+
+Results are auto-saved to `results_path` after every trial. If the process crashes, just re-run the same script — completed trials are reloaded from the CSV and replayed into HEBO, and optimization continues from where it left off:
+
+```python
+# First run: completes 12 of 30 trials, then crashes
+# Second run: loads 12 trials from results.csv, runs 13–30
+opt = HyperOptimizer(
+    source_files=[__file__],
+    n_iterations=30,
+    results_path="results.csv",
+)
+results = opt.run(objective)
+```
