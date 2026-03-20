@@ -1,112 +1,162 @@
 # lazyopt
 
-Lightweight Bayesian hyperparameter optimization using HEBO, with a `contextvars.ContextVar`-based lazy proxy pattern.
+Lightweight Bayesian hyperparameter optimization using [HEBO](https://github.com/huawei-noah/HEBO).
 
 ## Install
 
 ```bash
 git clone https://github.com/kegl/lazyopt.git
 cd lazyopt
-pip install -e .
+pip install -e ".[examples]"
 ```
 
-## How it works
+## Quick start
 
-### The proxy pattern
-
-Declare hyperparameters at module level with `hp()`. Each call returns a `HyperProxy` — a lazy object that resolves to the **default** value normally, but to the **trial** value during optimization:
+Here is the full example from [`examples/lgbm_classifier.py`](examples/lgbm_classifier.py). It optimizes 5 LightGBM hyperparameters on the breast cancer dataset using 5-fold cross-validation.
 
 ```python
-from lazyopt import hp
+import numpy as np
+from lightgbm import LGBMClassifier
+from sklearn.datasets import load_breast_cancer
+from sklearn.model_selection import cross_val_score
 
-learning_rate = hp("learning_rate", "float", 0.1,
-                   values=[0.01, 0.05, 0.1, 0.2])
+from lazyopt import HyperOptimizer, hp
+
+# Hyperparameters with inline grids
+lr = hp("learning_rate", "float", 0.1, values=[0.005, 0.01, 0.05, 0.1, 0.2, 0.3])
+max_depth = hp("max_depth", "int", 5, values=[3, 4, 5, 6, 7, 8, 10])
+
+# Hyperparameters whose grids are defined in hyperparams.yaml
+n_estimators = hp("n_estimators", "int", 100)
+num_leaves = hp("num_leaves", "int", 31)
+min_child_samples = hp("min_child_samples", "int", 20)
+
+X, y = load_breast_cancer(return_X_y=True)
+
+
+def objective():
+    LR = float(lr)
+    MAX_DEPTH = int(max_depth)
+    N_ESTIMATORS = int(n_estimators)
+    NUM_LEAVES = int(num_leaves)
+    MIN_CHILD_SAMPLES = int(min_child_samples)
+
+    clf = LGBMClassifier(
+        learning_rate=LR,
+        max_depth=MAX_DEPTH,
+        n_estimators=N_ESTIMATORS,
+        num_leaves=NUM_LEAVES,
+        min_child_samples=MIN_CHILD_SAMPLES,
+        verbose=-1,
+    )
+    scores = cross_val_score(clf, X, y, cv=5, scoring="accuracy")
+    return 1 - np.mean(scores)
+
+
+if __name__ == "__main__":
+    opt = HyperOptimizer(
+        source_files=[__file__],
+        yaml_config="examples/hyperparams.yaml",
+        n_iterations=30,
+        results_path="lgbm_results.csv",
+        seed=42,
+    )
+    results = opt.run(objective)
+    print(f"\n{results}")
 ```
 
-Inside your objective function, cast the proxy to a concrete type:
+### How it works
+
+**1. Declare hyperparameters** with `hp()` at module level. Each `hp()` call takes a name, a type, and a default value. You can provide the grid of candidate values inline:
+
+```python
+lr = hp("learning_rate", "float", 0.1, values=[0.005, 0.01, 0.05, 0.1, 0.2, 0.3])
+```
+
+or omit `values` and define the grid in a YAML file instead:
+
+```python
+n_estimators = hp("n_estimators", "int", 100)
+```
+
+```yaml
+# hyperparams.yaml
+lgbm_classifier:                 # must match the source filename stem
+  n_estimators:
+    dtype: int
+    default: 100
+    values: [50, 100, 200, 300, 500]
+```
+
+**2. Resolve hyperparameters** inside the objective function by casting to the correct type. The convention is lowercase proxy, uppercase resolved value:
 
 ```python
 def objective():
-    lr = float(learning_rate)   # resolves to trial value during optimization
+    LR = float(lr)
+    MAX_DEPTH = int(max_depth)
     ...
 ```
 
-Under the hood, `HyperOptimizer` sets a `contextvars.ContextVar` before calling `objective()`, so `float(learning_rate)` returns the HEBO-suggested value. Outside of a trial, it returns the default (`0.1`).
+During optimization, `float(lr)` returns the value suggested by HEBO. Outside of optimization, it returns the default (`0.1`).
 
-### Namespace auto-inference
-
-The namespace is inferred from the caller's filename stem. For `my_model.py`, `hp("lr", ...)` registers as `my_model.lr`. This avoids collisions when multiple files declare hyperparameters.
-
-### Search space
-
-Grids can be declared inline (via `values=`) or in a YAML file as fallback:
-
-```yaml
-my_model:
-  lr:
-    dtype: float
-    default: 0.1
-    values: [0.01, 0.05, 0.1, 0.2]
-```
-
-The optimizer AST-parses your source files to collect the search space — no need to import your modules.
-
-## Usage
+**3. Return a score to minimize.** The objective function returns a scalar. Since we want to maximize accuracy, we return the error rate:
 
 ```python
-from lazyopt import hp, HyperOptimizer
-
-# Declare hyperparameters at module level
-lr = hp("lr", "float", 0.1, values=[0.01, 0.05, 0.1, 0.2])
-depth = hp("depth", "int", 5, values=[3, 5, 7, 9])
-
-def objective():
-    # Cast proxies to concrete types
-    model = MyModel(lr=float(lr), depth=int(depth))
-    return model.evaluate()  # return score to minimize
-
-opt = HyperOptimizer(
-    source_files=[__file__],
-    n_iterations=30,
-    results_path="results.csv",  # auto-saves after each trial
-)
-results = opt.run(objective)
-print(results.best_score, results.best_params)
+    return 1 - np.mean(scores)
 ```
 
-## Example
+**4. Run the optimizer.** `HyperOptimizer` reads the search space directly from the source file (via AST parsing — your module is never imported) and from the optional YAML config:
+
+```python
+opt = HyperOptimizer(
+    source_files=[__file__],
+    yaml_config="examples/hyperparams.yaml",
+    n_iterations=30,
+    results_path="lgbm_results.csv",
+)
+results = opt.run(objective)
+```
+
+### Running the example
 
 ```bash
 python examples/lgbm_classifier.py
 ```
 
-Runs 30 HEBO iterations optimizing 5 LightGBM hyperparameters on the breast cancer dataset with 5-fold cross-validation.
+Output:
 
-## API
-
-| Symbol | Description |
-|--------|-------------|
-| `hp(name, dtype, default, values=None)` | Declare a hyperparameter proxy |
-| `HyperOptimizer(source_files, ..., results_path="results.csv", ...)` | Create optimizer |
-| `HyperOptimizer.run(objective)` | Run optimization, returns `TrialResults` |
-| `TrialResults.best_score` | Best (minimum) score |
-| `TrialResults.best_params` | Parameters of the best trial |
-| `TrialResults.from_csv(path)` | Load results from a previous run |
-| `TrialResults.to_csv(path)` / `to_json(path)` | Export results |
-| `get_registry()` | Return the current proxy registry |
-| `clear_registry()` | Clear all registered proxies |
+```
+[1/30] score=0.026362  params={'learning_rate': 0.3, 'max_depth': 3, ...}
+[2/30] score=0.040413  params={'learning_rate': 0.05, 'max_depth': 6, ...}
+...
+Best score: 0.022854
+Best params: {'lgbm_classifier.learning_rate': 0.3, ...}
+```
 
 ## Crash recovery and resume
 
-Results are auto-saved to `results_path` after every trial. If the process crashes, just re-run the same script — completed trials are reloaded from the CSV and replayed into HEBO, and optimization continues from where it left off:
+Results are saved to `results_path` after every trial (atomically, so a crash mid-write can't corrupt the file). If the process crashes, re-run the same script — completed trials are reloaded and optimization continues from where it left off:
 
 ```python
 # First run: completes 12 of 30 trials, then crashes
 # Second run: loads 12 trials from results.csv, runs 13–30
 opt = HyperOptimizer(
     source_files=[__file__],
+    yaml_config="examples/hyperparams.yaml",
     n_iterations=30,
     results_path="results.csv",
 )
 results = opt.run(objective)
 ```
+
+## API
+
+| Symbol | Description |
+|--------|-------------|
+| `hp(name, dtype, default, values=None)` | Declare a hyperparameter |
+| `HyperOptimizer(source_files, yaml_config=None, n_iterations=50, results_path="results.csv", seed=42)` | Create optimizer |
+| `HyperOptimizer.run(objective)` | Run optimization, returns `TrialResults` |
+| `TrialResults.best_score` | Best (minimum) score |
+| `TrialResults.best_params` | Parameters of the best trial |
+| `TrialResults.from_csv(path)` | Load results from a previous run |
+| `TrialResults.to_csv(path)` / `to_json(path)` | Export results |
