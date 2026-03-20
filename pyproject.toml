@@ -1,0 +1,17 @@
+[project]
+name = "devai-hyperopt"
+version = "0.1.0"
+description = "Lightweight Bayesian hyperparameter optimization with ContextVar-based lazy proxies"
+requires-python = ">=3.10"
+dependencies = [
+    "hebo",
+    "pyyaml",
+    "numpy",
+    "pandas",
+]
+
+[project.optional-dependencies]
+examples = [
+    "lightgbm",
+    "scikit-learn",
+]

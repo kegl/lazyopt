@@ -1,0 +1,25 @@
+# Alternative YAML-based grid configuration.
+# Use with: HyperOptimizer(source_files=[...], yaml_config="hyperparams.yaml")
+# YAML values are used as fallback when hp() calls omit the values argument.
+
+lgbm_classifier:
+  learning_rate:
+    dtype: float
+    default: 0.1
+    values: [0.005, 0.01, 0.05, 0.1, 0.2, 0.3]
+  max_depth:
+    dtype: int
+    default: 5
+    values: [3, 4, 5, 6, 7, 8, 10]
+  n_estimators:
+    dtype: int
+    default: 100
+    values: [50, 100, 200, 300, 500]
+  num_leaves:
+    dtype: int
+    default: 31
+    values: [15, 20, 31, 40, 50, 63]
+  min_child_samples:
+    dtype: int
+    default: 20
+    values: [5, 10, 20, 30, 50]
