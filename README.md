@@ -12,15 +12,12 @@ pip install -e ".[examples]"
 
 ## Quick start
 
-The typical setup has two files: a **model file** that declares the hyperparameters and the objective, and an **optimizer script** that runs the search.
+The typical setup has two files: a **model file** that declares the hyperparameters and builds the model, and an **optimizer script** that defines the objective and runs the search.
 
 ### Model file ([`examples/lgbm_classifier.py`](examples/lgbm_classifier.py))
 
 ```python
-import numpy as np
 from lightgbm import LGBMClassifier
-from sklearn.datasets import load_breast_cancer
-from sklearn.model_selection import cross_val_score
 
 from lazyopt import hp
 
@@ -33,18 +30,16 @@ n_estimators = hp("n_estimators", "int", 100)
 num_leaves = hp("num_leaves", "int", 31)
 min_child_samples = hp("min_child_samples", "int", 20)
 
-X, y = load_breast_cancer(return_X_y=True)
 
-
-def objective():
-    # Resolve proxies to trial values (must be inside objective, not at module level)
+def get_classifier():
+    # Resolve proxies to trial values (must be inside a function, not at module level)
     LR = float(lr)
     MAX_DEPTH = int(max_depth)
     N_ESTIMATORS = int(n_estimators)
     NUM_LEAVES = int(num_leaves)
     MIN_CHILD_SAMPLES = int(min_child_samples)
 
-    clf = LGBMClassifier(
+    return LGBMClassifier(
         learning_rate=LR,
         max_depth=MAX_DEPTH,
         n_estimators=N_ESTIMATORS,
@@ -52,18 +47,29 @@ def objective():
         min_child_samples=MIN_CHILD_SAMPLES,
         verbose=-1,
     )
-    scores = cross_val_score(clf, X, y, cv=5, scoring="accuracy")
-    return 1 - np.mean(scores)
 ```
 
-The model file is a regular Python module. It can be imported and used directly — outside of optimization, all `hp()` proxies resolve to their defaults.
+The model file declares the hyperparameters and exposes the model through `get_classifier()`. It can be imported and used directly — outside of optimization, all `hp()` proxies resolve to their defaults.
 
 ### Optimizer script ([`examples/optimize.py`](examples/optimize.py))
 
 ```python
+import numpy as np
+from sklearn.datasets import load_breast_cancer
+from sklearn.model_selection import cross_val_score
+
 from lazyopt import HyperOptimizer
 
-from lgbm_classifier import objective
+from lgbm_classifier import get_classifier
+
+X, y = load_breast_cancer(return_X_y=True)
+
+
+def objective():
+    clf = get_classifier()
+    scores = cross_val_score(clf, X, y, cv=5, scoring="accuracy")
+    return 1 - np.mean(scores)
+
 
 if __name__ == "__main__":
     opt = HyperOptimizer(
@@ -77,7 +83,7 @@ if __name__ == "__main__":
     print(f"\n{results}")
 ```
 
-The optimizer script imports the objective and points `source_files` to the model file. `HyperOptimizer` reads the search space by AST-parsing the source file — it never imports it, so the two mechanisms are independent.
+The optimizer script defines the objective (data loading, cross-validation, scoring) and runs the search. It has no `hp()` calls — those live in the model file.
 
 ### Running the example
 
@@ -95,7 +101,7 @@ Best params: {'lgbm_classifier.learning_rate': 0.3, ...}
 
 ## How it works
 
-**1. Declare hyperparameters** with `hp()` at module level. Each call takes a name, a type, and a default. You can provide the grid of candidate values inline:
+**1. Declare hyperparameters** with `hp()` in the model file. Each call takes a name, a type, and a default. You can provide the grid of candidate values inline:
 
 ```python
 lr = hp("learning_rate", "float", 0.1, values=[0.005, 0.01, 0.05, 0.1, 0.2, 0.3])
@@ -116,11 +122,11 @@ lgbm_classifier:
     values: [50, 100, 200, 300, 500]
 ```
 
-**2. Resolve hyperparameters** inside the objective by casting to the correct type. The convention is lowercase proxy, uppercase resolved value:
+**2. Resolve hyperparameters** by casting to the correct type inside a function (e.g. `get_classifier()`). The convention is lowercase proxy, uppercase resolved value:
 
 ```python
-def objective():
-    # Must be inside objective(), not at module level
+def get_classifier():
+    # Must be inside a function, not at module level
     LR = float(lr)
     MAX_DEPTH = int(max_depth)
     ...
@@ -128,13 +134,16 @@ def objective():
 
 The optimizer sets a trial context before each call to `objective()`, so `float(lr)` returns the HEBO-suggested value for that trial. At module level, `float(lr)` would just return the default once and never change.
 
-**3. Return a score to minimize.** Since we want to maximize accuracy, we return the error rate:
+**3. Return a score to minimize.** The objective calls the model and returns a scalar. Since we want to maximize accuracy, we return the error rate:
 
 ```python
+def objective():
+    clf = get_classifier()
+    scores = cross_val_score(clf, X, y, cv=5, scoring="accuracy")
     return 1 - np.mean(scores)
 ```
 
-**4. Run the optimizer** from a separate script. Pass `source_files` pointing to wherever the `hp()` calls are, and optionally a `yaml_config` for grids defined externally:
+**4. Run the optimizer** from the optimizer script. Pass `source_files` pointing to the model file, and optionally a `yaml_config` for grids defined externally:
 
 ```python
 opt = HyperOptimizer(
