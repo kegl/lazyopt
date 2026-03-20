@@ -1,16 +1,16 @@
-"""Tests for devai_hyperopt.optimizer."""
+"""Tests for lazyopt.optimizer."""
 
 import pytest
 
-from devai_hyperopt.context import _trial_context
-from devai_hyperopt.optimizer import HyperOptimizer
-from devai_hyperopt.results import TrialResults
+from lazyopt.context import _trial_context
+from lazyopt.optimizer import HyperOptimizer
+from lazyopt.results import TrialResults
 
 
 @pytest.fixture
 def quadratic_source(tmp_path):
     code = """
-from devai_hyperopt import hp
+from lazyopt import hp
 
 x = hp("x", "float", 0.0, values=[-2.0, -1.0, 0.0, 1.0, 2.0])
 """

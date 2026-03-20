@@ -1,5 +1,5 @@
 [project]
-name = "devai-hyperopt"
+name = "lazyopt"
 version = "0.1.0"
 description = "Lightweight Bayesian hyperparameter optimization with ContextVar-based lazy proxies"
 requires-python = ">=3.10"

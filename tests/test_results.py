@@ -1,10 +1,10 @@
-"""Tests for devai_hyperopt.results."""
+"""Tests for lazyopt.results."""
 
 import json
 
 import pytest
 
-from devai_hyperopt.results import TrialResults
+from lazyopt.results import TrialResults
 
 
 class TestTrialResults:

@@ -1,8 +1,8 @@
-"""Tests for devai_hyperopt.space."""
+"""Tests for lazyopt.space."""
 
 import pytest
 
-from devai_hyperopt.space import (
+from lazyopt.space import (
     parse_hp_calls,
     load_yaml_config,
     collect_search_space,
@@ -13,7 +13,7 @@ from devai_hyperopt.space import (
 @pytest.fixture
 def sample_source(tmp_path):
     code = """
-from devai_hyperopt import hp
+from lazyopt import hp
 
 lr = hp("lr", "float", 0.1, values=[0.01, 0.1, 1.0])
 depth = hp("depth", "int", 5, values=[3, 5, 7])
@@ -61,7 +61,7 @@ class TestParseHpCalls:
 
     def test_keyword_args(self, tmp_path):
         code = """
-from devai_hyperopt import hp
+from lazyopt import hp
 x = hp(name="x", dtype="int", default=1, values=[1, 2, 3])
 """
         p = tmp_path / "kw_model.py"
@@ -87,7 +87,7 @@ class TestCollectSearchSpace:
 
     def test_yaml_fallback(self, tmp_path, sample_yaml):
         code = """
-from devai_hyperopt import hp
+from lazyopt import hp
 lr = hp("lr", "float", 0.1)
 """
         p = tmp_path / "my_model.py"
@@ -98,7 +98,7 @@ lr = hp("lr", "float", 0.1)
 
     def test_missing_values_raises(self, tmp_path):
         code = """
-from devai_hyperopt import hp
+from lazyopt import hp
 lr = hp("lr", "float", 0.1)
 """
         p = tmp_path / "no_grid.py"

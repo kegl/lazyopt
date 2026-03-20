@@ -1,14 +1,14 @@
-# Contributing to devai-hyperopt
+# Contributing to lazyopt
 
-We welcome contributions to devai-hyperopt! By participating, you agree to abide by our guidelines.
+We welcome contributions to lazyopt! By participating, you agree to abide by our guidelines.
 
 ## Getting Started
 
 1. Fork the repository
 2. Clone your fork and install in development mode:
    ```bash
-   git clone git@github.com:<your-username>/devai-hyperopt.git
-   cd devai-hyperopt
+   git clone git@github.com:<your-username>/lazyopt.git
+   cd lazyopt
    pip install -e ".[examples]"
    pip install pytest ruff
    ```
@@ -30,8 +30,8 @@ pytest tests/ -v
 We use [ruff](https://docs.astral.sh/ruff/) for linting and formatting:
 
 ```bash
-ruff check devai_hyperopt/ tests/
-ruff format devai_hyperopt/ tests/
+ruff check lazyopt/ tests/
+ruff format lazyopt/ tests/
 ```
 
 All code must pass `ruff check` and `ruff format --check` before merging.

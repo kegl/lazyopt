@@ -1,12 +1,12 @@
-# devai-hyperopt
+# lazyopt
 
 Lightweight Bayesian hyperparameter optimization using HEBO, with a `contextvars.ContextVar`-based lazy proxy pattern.
 
 ## Install
 
 ```bash
-git clone https://github.com/facebookresearch/devai-hyperopt.git
-cd devai-hyperopt
+git clone https://github.com/facebookresearch/lazyopt.git
+cd lazyopt
 pip install -e .
 ```
 
@@ -17,7 +17,7 @@ pip install -e .
 Declare hyperparameters at module level with `hp()`. Each call returns a `HyperProxy` — a lazy object that resolves to the **default** value normally, but to the **trial** value during optimization:
 
 ```python
-from devai_hyperopt import hp
+from lazyopt import hp
 
 learning_rate = hp("learning_rate", "float", 0.1,
                    values=[0.01, 0.05, 0.1, 0.2])
@@ -54,7 +54,7 @@ The optimizer AST-parses your source files to collect the search space — no ne
 ## Usage
 
 ```python
-from devai_hyperopt import hp, HyperOptimizer
+from lazyopt import hp, HyperOptimizer
 
 # Declare hyperparameters at module level
 lr = hp("lr", "float", 0.1, values=[0.01, 0.05, 0.1, 0.2])

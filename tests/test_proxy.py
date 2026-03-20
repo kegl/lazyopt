@@ -1,7 +1,7 @@
-"""Tests for devai_hyperopt.proxy."""
+"""Tests for lazyopt.proxy."""
 
 import pytest
-from devai_hyperopt.proxy import HyperProxy, clear_registry, get_registry
+from lazyopt.proxy import HyperProxy, clear_registry, get_registry
 
 
 @pytest.fixture(autouse=True)
@@ -17,7 +17,7 @@ class TestHyperProxy:
         assert float(p) == 0.1
 
     def test_resolve_trial_value(self):
-        from devai_hyperopt.context import _trial_context
+        from lazyopt.context import _trial_context
 
         p = HyperProxy("lr", "model", "float", 0.1, [0.01, 0.1, 1.0])
         token = _trial_context.set({"model.lr": 0.01})
@@ -66,7 +66,7 @@ class TestHyperProxy:
 
 class TestRegistry:
     def test_hp_registers(self):
-        from devai_hyperopt.proxy import _registry
+        from lazyopt.proxy import _registry
 
         p = HyperProxy("lr", "test_ns", "float", 0.1)
         _registry[p.qualified_name] = p
@@ -75,7 +75,7 @@ class TestRegistry:
         assert reg["test_ns.lr"] is p
 
     def test_clear(self):
-        from devai_hyperopt.proxy import _registry
+        from lazyopt.proxy import _registry
 
         _registry["x.y"] = HyperProxy("y", "x", "float", 1.0)
         clear_registry()

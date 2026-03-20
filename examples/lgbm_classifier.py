@@ -1,6 +1,6 @@
 """LightGBM classifier hyperparameter optimization on breast cancer dataset."""
 
-from devai_hyperopt import hp, HyperOptimizer
+from lazyopt import hp, HyperOptimizer
 
 from sklearn.datasets import load_breast_cancer
 from sklearn.model_selection import cross_val_score

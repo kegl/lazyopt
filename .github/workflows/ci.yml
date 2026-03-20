@@ -47,7 +47,7 @@ jobs:
         run: pip install ruff
 
       - name: Ruff check
-        run: ruff check devai_hyperopt/ tests/
+        run: ruff check lazyopt/ tests/
 
       - name: Ruff format check
-        run: ruff format --check devai_hyperopt/ tests/
+        run: ruff format --check lazyopt/ tests/

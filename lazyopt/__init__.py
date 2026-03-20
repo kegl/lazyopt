@@ -1,4 +1,4 @@
-"""devai-hyperopt: lightweight Bayesian hyperparameter optimization."""
+"""lazyopt: lightweight Bayesian hyperparameter optimization."""
 
 from .proxy import hp, get_registry, clear_registry, HyperProxy
 from .optimizer import HyperOptimizer

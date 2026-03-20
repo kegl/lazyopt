@@ -1,6 +1,6 @@
-"""Tests for devai_hyperopt.context."""
+"""Tests for lazyopt.context."""
 
-from devai_hyperopt.context import _trial_context
+from lazyopt.context import _trial_context
 
 
 def test_default_is_none():
