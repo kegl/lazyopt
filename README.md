@@ -97,7 +97,7 @@ def objective():
     ...
 ```
 
-During optimization, `float(lr)` returns the value suggested by HEBO. Outside of optimization, it returns the default (`0.1`).
+This must happen inside `objective()`, not at module level. The optimizer sets a trial context before each call to `objective()`, so `float(lr)` returns the HEBO-suggested value for that trial. At module level, `float(lr)` would just return the default (`0.1`) once and never change.
 
 **3. Return a score to minimize.** The objective function returns a scalar. Since we want to maximize accuracy, we return the error rate:
 
