@@ -40,11 +40,13 @@ class TrialResults:
     def to_json(self, path: str) -> None:
         records = []
         for it, params, score in self._trials:
-            records.append({
-                "iteration": it,
-                "params": params,
-                "score": score,
-            })
+            records.append(
+                {
+                    "iteration": it,
+                    "params": params,
+                    "score": score,
+                }
+            )
         with open(path, "w") as f:
             json.dump(records, f, indent=2, default=str)
 
@@ -52,7 +54,4 @@ class TrialResults:
         n = len(self._trials)
         if n == 0:
             return "TrialResults(0 trials)"
-        return (
-            f"TrialResults({n} trials, "
-            f"best_score={self.best_score:.6f})"
-        )
+        return f"TrialResults({n} trials, best_score={self.best_score:.6f})"

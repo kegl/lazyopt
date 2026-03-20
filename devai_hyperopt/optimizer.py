@@ -76,8 +76,7 @@ class HyperOptimizer:
             results.add(i, values_dict, score)
 
             short_params = {
-                p["name"]: values_dict[p["qualified_name"]]
-                for p in self.params
+                p["name"]: values_dict[p["qualified_name"]] for p in self.params
             }
             print(
                 f"[{i + 1}/{self.n_iterations}] "

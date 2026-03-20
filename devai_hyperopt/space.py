@@ -2,7 +2,6 @@
 
 import ast
 import yaml
-import numpy as np
 from pathlib import Path
 from hebo.design_space.design_space import DesignSpace
 
@@ -23,7 +22,7 @@ def parse_hp_calls(source_file: str) -> list[dict]:
         func = node.func
         if isinstance(func, ast.Name) and func.id == "hp":
             pass
-        elif (isinstance(func, ast.Attribute) and func.attr == "hp"):
+        elif isinstance(func, ast.Attribute) and func.attr == "hp":
             pass
         else:
             continue
@@ -37,14 +36,16 @@ def parse_hp_calls(source_file: str) -> list[dict]:
         values_node = args[3] if len(args) > 3 else kw.get("values")
         values = _eval_literal(values_node) if values_node is not None else None
 
-        params.append({
-            "name": name,
-            "namespace": namespace,
-            "qualified_name": f"{namespace}.{name}",
-            "dtype": dtype,
-            "default": default,
-            "values": values,
-        })
+        params.append(
+            {
+                "name": name,
+                "namespace": namespace,
+                "qualified_name": f"{namespace}.{name}",
+                "dtype": dtype,
+                "default": default,
+                "values": values,
+            }
+        )
     return params
 
 
@@ -132,12 +133,14 @@ def build_hebo_space(
         qname = p["qualified_name"]
         vals = list(p["values"])
         index_to_value[qname] = vals
-        space_cfg.append({
-            "name": qname,
-            "type": "int",
-            "lb": 0,
-            "ub": len(vals) - 1,
-        })
+        space_cfg.append(
+            {
+                "name": qname,
+                "type": "int",
+                "lb": 0,
+                "ub": len(vals) - 1,
+            }
+        )
 
     space = DesignSpace().parse(space_cfg)
     return space, index_to_value

@@ -16,8 +16,9 @@ class HyperProxy:
     casting via __float__, __int__, __str__, etc.
     """
 
-    def __init__(self, name: str, namespace: str, dtype: str,
-                 default, values: list | None = None):
+    def __init__(
+        self, name: str, namespace: str, dtype: str, default, values: list | None = None
+    ):
         self.name = name
         self.namespace = namespace
         self.qualified_name = f"{namespace}.{name}"
@@ -44,10 +45,7 @@ class HyperProxy:
         return bool(self._resolve())
 
     def __repr__(self):
-        return (
-            f"HyperProxy({self.qualified_name!r}, "
-            f"resolved={self._resolve()!r})"
-        )
+        return f"HyperProxy({self.qualified_name!r}, resolved={self._resolve()!r})"
 
     def __eq__(self, other):
         if isinstance(other, HyperProxy):

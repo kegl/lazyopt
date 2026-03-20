@@ -2,6 +2,4 @@
 
 from contextvars import ContextVar
 
-_trial_context: ContextVar[dict | None] = ContextVar(
-    "_trial_context", default=None
-)
+_trial_context: ContextVar[dict | None] = ContextVar("_trial_context", default=None)
