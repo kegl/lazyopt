@@ -12,9 +12,35 @@ pip install -e ".[examples]"
 
 ## Quick start
 
-The typical setup has two files: a **model file** that declares the hyperparameters and builds the model, and an **optimizer script** that defines the objective and runs the search.
+Hyperparameters can be scattered across multiple files in your project. Each file declares its own `hp()` calls, and the optimizer collects them all. The example below has three files: feature engineering, model, and optimizer.
 
-### Model file ([`examples/lgbm_classifier.py`](examples/lgbm_classifier.py))
+### Feature engineering ([`examples/feature_engineering.py`](examples/feature_engineering.py))
+
+```python
+from sklearn.preprocessing import PolynomialFeatures, StandardScaler
+
+from lazyopt import hp
+
+poly_degree = hp("poly_degree", "int", 1, values=[1, 2, 3])
+use_interactions = hp("use_interactions", "int", 0, values=[0, 1])
+
+
+def transform(X):
+    POLY_DEGREE = int(poly_degree)
+    USE_INTERACTIONS = int(use_interactions)
+
+    if POLY_DEGREE > 1:
+        interaction_only = not bool(USE_INTERACTIONS)
+        poly = PolynomialFeatures(
+            degree=POLY_DEGREE, interaction_only=interaction_only, include_bias=False
+        )
+        X = poly.fit_transform(X)
+
+    X = StandardScaler().fit_transform(X)
+    return X
+```
+
+### Model ([`examples/lgbm_classifier.py`](examples/lgbm_classifier.py))
 
 ```python
 from lightgbm import LGBMClassifier
@@ -49,9 +75,9 @@ def get_classifier():
     )
 ```
 
-The model file declares the hyperparameters and exposes the model through `get_classifier()`. It can be imported and used directly — outside of optimization, all `hp()` proxies resolve to their defaults.
+Each file can be imported and used on its own — outside of optimization, all `hp()` proxies resolve to their defaults.
 
-### Optimizer script ([`examples/optimize.py`](examples/optimize.py))
+### Optimizer ([`examples/optimize.py`](examples/optimize.py))
 
 ```python
 import numpy as np
@@ -60,20 +86,25 @@ from sklearn.model_selection import cross_val_score
 
 from lazyopt import HyperOptimizer
 
+from feature_engineering import transform
 from lgbm_classifier import get_classifier
 
 X, y = load_breast_cancer(return_X_y=True)
 
 
 def objective():
+    X_transformed = transform(X)
     clf = get_classifier()
-    scores = cross_val_score(clf, X, y, cv=5, scoring="accuracy")
+    scores = cross_val_score(clf, X_transformed, y, cv=5, scoring="accuracy")
     return 1 - np.mean(scores)
 
 
 if __name__ == "__main__":
     opt = HyperOptimizer(
-        source_files=["examples/lgbm_classifier.py"],
+        source_files=[
+            "examples/feature_engineering.py",
+            "examples/lgbm_classifier.py",
+        ],
         yaml_config="examples/hyperparams.yaml",
         n_iterations=30,
         results_path="lgbm_results.csv",
@@ -83,7 +114,7 @@ if __name__ == "__main__":
     print(f"\n{results}")
 ```
 
-The optimizer script defines the objective (data loading, cross-validation, scoring) and runs the search. It has no `hp()` calls — those live in the model file.
+The optimizer script has no `hp()` calls — it just defines the objective and points `source_files` to all files that contain hyperparameters. `HyperOptimizer` reads the search space by AST-parsing those files (it never imports them).
 
 ### Running the example
 
@@ -96,12 +127,11 @@ python examples/optimize.py
 [2/30] score=0.040413  params={'learning_rate': 0.05, 'max_depth': 6, ...}
 ...
 Best score: 0.022854
-Best params: {'lgbm_classifier.learning_rate': 0.3, ...}
 ```
 
 ## How it works
 
-**1. Declare hyperparameters** with `hp()` in the model file. Each call takes a name, a type, and a default. You can provide the grid of candidate values inline:
+**1. Declare hyperparameters** with `hp()` in your model or pipeline files. Each call takes a name, a type, and a default. You can provide the grid of candidate values inline:
 
 ```python
 lr = hp("learning_rate", "float", 0.1, values=[0.005, 0.01, 0.05, 0.1, 0.2, 0.3])
@@ -122,7 +152,7 @@ lgbm_classifier:
     values: [50, 100, 200, 300, 500]
 ```
 
-**2. Resolve hyperparameters** by casting to the correct type inside a function (e.g. `get_classifier()`). The convention is lowercase proxy, uppercase resolved value:
+**2. Resolve hyperparameters** by casting to the correct type inside a function. The convention is lowercase proxy, uppercase resolved value:
 
 ```python
 def get_classifier():
@@ -138,16 +168,20 @@ The optimizer sets a trial context before each call to `objective()`, so `float(
 
 ```python
 def objective():
+    X_transformed = transform(X)
     clf = get_classifier()
-    scores = cross_val_score(clf, X, y, cv=5, scoring="accuracy")
+    scores = cross_val_score(clf, X_transformed, y, cv=5, scoring="accuracy")
     return 1 - np.mean(scores)
 ```
 
-**4. Run the optimizer** from the optimizer script. Pass `source_files` pointing to the model file, and optionally a `yaml_config` for grids defined externally:
+**4. Run the optimizer.** List all files that contain `hp()` calls in `source_files`:
 
 ```python
 opt = HyperOptimizer(
-    source_files=["examples/lgbm_classifier.py"],
+    source_files=[
+        "examples/feature_engineering.py",
+        "examples/lgbm_classifier.py",
+    ],
     yaml_config="examples/hyperparams.yaml",
     n_iterations=30,
     results_path="lgbm_results.csv",
@@ -162,12 +196,6 @@ Results are saved to `results_path` after every trial (atomically, so a crash mi
 ```python
 # First run: completes 12 of 30 trials, then crashes
 # Second run: loads 12 trials from results.csv, runs 13–30
-opt = HyperOptimizer(
-    source_files=["examples/lgbm_classifier.py"],
-    yaml_config="examples/hyperparams.yaml",
-    n_iterations=30,
-    results_path="results.csv",
-)
 results = opt.run(objective)
 ```
 

@@ -1,5 +1,5 @@
-# Grids for hyperparameters not declared inline in lgbm_classifier.py.
-# The namespace must match the source filename stem (lgbm_classifier).
+# Grids for hyperparameters not declared inline.
+# Namespace must match the source filename stem.
 
 lgbm_classifier:
   n_estimators:
