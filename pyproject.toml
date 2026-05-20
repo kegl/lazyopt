@@ -14,7 +14,7 @@ classifiers = [
     "Topic :: Scientific/Engineering :: Artificial Intelligence",
 ]
 dependencies = [
-    "hebo>=0.3.0",
+    "hebo @ git+https://github.com/kegl/HEBO.git@sparse_grid_space#subdirectory=HEBO",
     "pymoo<0.6",
     "pyyaml>=6.0",
     "numpy>=1.21",
