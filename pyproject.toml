@@ -15,7 +15,6 @@ classifiers = [
 ]
 dependencies = [
     "hebo @ git+https://github.com/kegl/HEBO.git@sparse_grid_space#subdirectory=HEBO",
-    "pymoo<0.6",
     "pyyaml>=6.0",
     "numpy>=1.21",
     "pandas>=1.3",
